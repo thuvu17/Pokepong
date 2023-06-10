@@ -303,11 +303,8 @@ void update()
     model_matrix_boy = glm::translate(model_matrix_boy, trans_vector_boy);
     
     // If boy catches apple or apple falls out of bound, apple respawn
-    if ((apple_x <= basket_x_right and apple_x >= basket_x_left
-         and apple_y <= basket_y_top and apple_y >= basket_y_bottom)
-        or apple_y <= -8.0f)
+    if (apple_y <= -8.0f)
     {
-        apple_x = rand() % 4 + 1.0f;
         apple_y = APPLE_INIT_POSITION.y;
     }
     
