@@ -70,8 +70,8 @@ glm::mat4 g_view_matrix,            // Camera position
           g_projection_matrix;      // Camera characteristics
 
 // Initial positions
-const glm::vec3 APPLE_INIT_POSITION (-3.0f, 3.0f, 0.0f),
-                BOY_INIT_POSITION (-17.2f, -1.5f, 0.0f),
+const glm::vec3 APPLE_INIT_POSITION (0.0f, 3.0f, 0.0f),
+                BOY_INIT_POSITION (0.0f, -1.5f, 0.0f),
                 SUN_INIT_POSITION (3.5f, 2.5f, 0.0f);
 
 // Sizes
@@ -79,11 +79,10 @@ const float APPLE_SIZE = 0.75f,
             BOY_SIZE = 3.5f,
             SUN_SIZE = 1.5f;
 
-// Keeping track of apple's and basket's current position
-float   apple_x = APPLE_INIT_POSITION.x,  // center of apple
-        apple_y = APPLE_INIT_POSITION.y,  // center of apple
-        basket_y_top = BOY_INIT_POSITION.y + BOY_SIZE * 0.5f,
-        basket_y_bottom = BOY_INIT_POSITION.y + BOY_SIZE * 0.375f;
+// Current position
+float   apple_x = APPLE_INIT_POSITION.x,
+        apple_y = APPLE_INIT_POSITION.y,
+        boy_x = BOY_INIT_POSITION.x;
 
 
 // Const for scaling for sun
@@ -92,9 +91,9 @@ float sun_scale = 1.0f;
 
 // Rotation and translation const
 const float ROT_ANGLE = 90.0f;
-const float TRAN_VALUE = 2.0f;
-float  angle = 0.0f,
-       boy_trans_x = 0.0f;
+const float TRAN_VALUE = 1.0f;
+float angle = 0.0f;
+bool moving_right = true;
 
 // Ticks
 float previous_ticks = 0.0f;
@@ -103,44 +102,44 @@ float previous_ticks = 0.0f;
 SDL_Window* display_window;
 bool game_is_running = true;
 
+// Load texture const
+const int NUMBER_OF_TEXTURES = 1;
+const GLint LEVEL_OF_DETAIL = 0;
+const GLint TEXTURE_BORDER = 0;
 
-// LOAD_TEXTURE
+
+// LOAD TEXTURE
 GLuint load_texture(const char* filepath)
 {
-    // Load image file
+    // STEP 1: Loading the image file
     int width, height, number_of_components;
+    unsigned char* image = stbi_load(filepath, &width, &height, &number_of_components, STBI_rgb_alpha);
     
-    unsigned char* image = stbi_load(filepath, &width, &height,
-                                     &number_of_components, STBI_rgb_alpha);
-    
-    // If load fails, quit game
     if (image == NULL)
     {
-        LOG("Unable to load image.");
+        LOG("Unable to load image. Make sure the path is correct.");
         assert(false);
     }
     
-    // Generate and bind texture ID to game
-    GLuint texture_id;
+    // STEP 2: Generating and binding a texture ID to our image
+    GLuint textureID;
+    glGenTextures(NUMBER_OF_TEXTURES, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, LEVEL_OF_DETAIL, GL_RGBA, width, height, TEXTURE_BORDER, GL_RGBA, GL_UNSIGNED_BYTE, image);
     
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, image);
-    
-    // Set texture filter parameters
+    // STEP 3: Setting our texture filter parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     
-    // Release file from memory
+    // STEP 4: Releasing our file from memory and returning our texture id
     stbi_image_free(image);
     
-    return texture_id;
+    return textureID;
 }
 
 // DRAW_OBJECT
-void draw_object(ShaderProgram &program, glm::mat4 &object_model_matrix,
-                 GLuint &object_texture_id, float* vertices,
+void draw_object(ShaderProgram &program, glm::mat4 &model_matrix,
+                 GLuint &texture_id, float* vertices,
                  float* texture_coordinates)
 {
     
@@ -152,8 +151,8 @@ void draw_object(ShaderProgram &program, glm::mat4 &object_model_matrix,
     glEnableVertexAttribArray(program.texCoordAttribute);
     
     // Bind texture
-    program.SetModelMatrix(object_model_matrix);
-    glBindTexture(GL_TEXTURE_2D, object_texture_id);
+    program.SetModelMatrix(model_matrix);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
     // Disable attribute arrays
@@ -164,20 +163,17 @@ void draw_object(ShaderProgram &program, glm::mat4 &object_model_matrix,
 
 // INITIALISE OBJECTS
 void init_objects(ShaderProgram &program, GLuint &texture_id,
-                  const char* sprite, glm::mat4 &model_matrix,
-                  glm::mat4 &view_matrix, glm::mat4 &projection_matrix,
-                  const glm::vec3 &starting_position, const float size)
+                  const char* sprite, glm::mat4 &model_matrix, 
+                  glm::mat4 &view_matrix, glm::mat4 &projection_matrix)
 {
     // Load up shaders
     program.Load(V_SHADER_PATH, F_SHADER_PATH);
     
+    // Initialize model matrix
+    model_matrix = glm::mat4(1.0f);
+    
     // Load texture
     texture_id = load_texture(sprite);
-    
-    // Initialize model matrix and set initial position and size
-    model_matrix  = glm::mat4(1.0f);
-    model_matrix  = glm::translate(model_matrix, starting_position);
-    model_matrix = glm::scale(model_matrix, glm::vec3(size, size, 0.0f));
 
     // Set matrices
     program.SetProjectionMatrix(projection_matrix);
@@ -219,22 +215,20 @@ void initialise()
     // Initialise camera
     glViewport(VIEWPORT_X, VIEWPORT_Y, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
     
-    // Initialise view, model, and projection matrices
+    // Initialise view and projection matrices
     g_view_matrix       = glm::mat4(1.0f);
     
     g_projection_matrix = glm::ortho(-5.0f, 5.0f, -3.75f, 3.75f, -1.0f, 1.0f);
+    
 
     init_objects(program_apple, texture_id_apple, SPRITE_APPLE,
-                 model_matrix_apple, g_view_matrix, g_projection_matrix,
-                 APPLE_INIT_POSITION, APPLE_SIZE);
-    
+                 model_matrix_apple, g_view_matrix, g_projection_matrix);
+
     init_objects(program_boy, texture_id_boy, SPRITE_BOY,
-                 model_matrix_boy, g_view_matrix, g_projection_matrix,
-                 BOY_INIT_POSITION, BOY_SIZE);
-    
+                 model_matrix_boy, g_view_matrix, g_projection_matrix);
+
     init_objects(program_sun, texture_id_sun, SPRITE_SUN,
-                 model_matrix_sun, g_view_matrix, g_projection_matrix,
-                 SUN_INIT_POSITION, SUN_SIZE);
+                 model_matrix_sun, g_view_matrix, g_projection_matrix);
     
     // Enable blending
     glEnable(GL_BLEND);
@@ -264,29 +258,41 @@ void update()
     float ticks = (float) SDL_GetTicks() / 1000.0f;
     float delta_time = ticks - previous_ticks;
     previous_ticks = ticks;
-    
+
 
     // Updating motion values
-    if (int(floor(ticks)) % 2 == 0) {
+    if (moving_right == true) {
         sun_scale += SCALE_FACTOR * delta_time;
-        boy_trans_x += TRAN_VALUE * delta_time;
-        apple_x += TRAN_VALUE * delta_time;
+        boy_x += TRAN_VALUE * delta_time;
+        apple_x -= TRAN_VALUE * delta_time;
     } else {
         sun_scale -= SCALE_FACTOR * delta_time;
-        boy_trans_x -= TRAN_VALUE * delta_time;
-        apple_x -= TRAN_VALUE * delta_time;
+        boy_x -= TRAN_VALUE * delta_time;
+        apple_x += TRAN_VALUE * delta_time;
     }
     angle += ROT_ANGLE * delta_time;
     apple_y -= TRAN_VALUE * delta_time;
     
-    float   basket_x_right = BOY_INIT_POSITION.x + boy_trans_x,
-            basket_x_left = BOY_INIT_POSITION.x + boy_trans_x - BOY_SIZE * 0.5f;
-
+    // Out-of-bound conditions
+    if (boy_x < -0.5f) {
+        boy_x = -0.5f;
+        moving_right = true;
+    } else if (boy_x > 0.5f) {
+        boy_x = 0.5f;
+        moving_right = false; }
+    
+    // If apple falls out of bound, apple respawn
+    if (apple_y <= -8.0f)
+    {
+        apple_x = rand() % 4 - 2;
+        apple_y = APPLE_INIT_POSITION.y;
+    }
 
     // Reset model matrices
     reset(model_matrix_apple, APPLE_INIT_POSITION, APPLE_SIZE);
     reset(model_matrix_boy, BOY_INIT_POSITION, BOY_SIZE);
     reset(model_matrix_sun, SUN_INIT_POSITION, SUN_SIZE);
+    
     
     // Sun is rotating and scaling
     glm::vec3 rot_vector    = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -299,14 +305,8 @@ void update()
     model_matrix_apple = glm::translate(model_matrix_apple, trans_vector_apple);
 
     // Boy is moving left and right
-    glm::vec3 trans_vector_boy = glm::vec3(boy_trans_x, 0.0f, 0.0f);
+    glm::vec3 trans_vector_boy = glm::vec3(boy_x, 0.0f, 0.0f);
     model_matrix_boy = glm::translate(model_matrix_boy, trans_vector_boy);
-    
-    // If boy catches apple or apple falls out of bound, apple respawn
-    if (apple_y <= -8.0f)
-    {
-        apple_y = APPLE_INIT_POSITION.y;
-    }
     
 }
 
@@ -325,6 +325,7 @@ void render()
         0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
         0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
     };
+    
 
     // Draw objects
     draw_object(program_apple, model_matrix_apple, texture_id_apple,
