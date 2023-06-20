@@ -86,18 +86,20 @@ const glm::vec3 INIT_POSITION_LEFT_PAD (-3.5f, 0.0f, 0.0f),
 const glm::vec3 SIZE_PADDLE = glm::vec3(1.75f, 3.5f, 1.0f),
                 SIZE_BALL = glm::vec3(0.5f, 0.5f, 0.5f);
 
-// Tracking movement
+// Whether object is moving
 glm::vec3   movement_left_pad,
-            movement_right_pad,
-            movement_ball = glm::vec3(0.0f, 0.0f, 0.0f);
+            movement_right_pad = glm::vec3(0.0f, 0.0f, 0.0f);
+// Ball is initialized to move to the left corner
+glm::vec3   movement_ball = glm::vec3(-1.0f, -0.5f, 0.0f);
 
+// How much object has moved
 glm::vec3   position_left_pad,
             position_right_pad,
             position_ball = glm::vec3(0.0f, 0.0f, 0.0f);
 
 // Speed
 const float SPEED_PAD = 1.0f,
-            SPEED_BALL = 1.0f,
+            SPEED_BALL = 2.0f,
             ROT_SPEED_BALL = 45.f;
 
 float rot_angle = 0.0f;
@@ -144,7 +146,6 @@ void draw_object(ShaderProgram &program, glm::mat4 &model_matrix,
                  GLuint &texture_id, float* vertices,
                  float* texture_coordinates)
 {
-    
     // Vertices
     glVertexAttribPointer(program.positionAttribute, 2, GL_FLOAT, false, 0, vertices);
     glEnableVertexAttribArray(program.positionAttribute);
@@ -186,28 +187,76 @@ void init_objects(ShaderProgram &program, GLuint &texture_id,
 }
 
 // RESET
-void reset(glm::mat4 &model_matrix, const glm::vec3 &starting_position,
+void reset(glm::mat4 &model_matrix, const glm::vec3 init_position,
            const glm::vec3 size_vector)
 {
     // Reset model matrix
     model_matrix  = glm::mat4(1.0f);
-    // Set initial position
-    model_matrix  = glm::translate(model_matrix, starting_position);
+    // Translate to initial position
+    model_matrix  = glm::translate(model_matrix, init_position);
     // Set initial size
-    model_matrix = glm::scale(model_matrix, size_vector);
+    model_matrix  = glm::scale(model_matrix, size_vector);
 }
 
-bool is_out_of_bound(glm::vec3 &position, float height)
+// Checks whether objects hit the upper and lower walls
+bool is_out_of_bound(const glm::vec3 &init_position, glm::vec3 &position,
+                     const glm::vec3 scale_vector)
 {
-    float boundary_limit = 1.0f - 0.5f;
-    if (position.y <= -boundary_limit or position.y >= boundary_limit)
+    float window_height = 3.75f;
+    float boundary_limit = window_height - 0.5f * scale_vector.y;
+    glm::vec3 curr_position = (init_position + position) * scale_vector.y;
+    if (curr_position.y <= -boundary_limit or curr_position.y >= boundary_limit)
+    { return true; }
+    else { return false; }
+}
+
+// Checks whether ball hits left or right wall
+bool ball_hits_vertical_wall(const glm::vec3 &init_position, glm::vec3 &position)
+{
+    float window_width = 5.0f;
+    float boundary_limit = window_width - 0.5f * SIZE_BALL.x;
+    glm::vec3 curr_position = (init_position + position) * SIZE_BALL.x;
+    if (curr_position.x <= -boundary_limit or curr_position.x >= boundary_limit)
+    { return true; }
+    else { return false; }
+}
+
+// Move paddles according to user input and takes care of out-of-bound stuff
+void user_move_object(const glm::vec3 &init_position, glm::vec3 &position,
+                 const glm::vec3 scale_vector, glm::vec3 &movement,
+                 const float speed, glm::mat4 &model_matrix, float delta_time)
+{
+    // Set new position
+    position += movement * speed * delta_time;
+    // If out-of-bound, do not let add to position
+    if (is_out_of_bound(init_position, position, scale_vector))
     {
-        return true;
+        position -= movement * speed * delta_time;
     }
-    else
-    {
-        return false;
-    }
+    // Translate to new position
+    model_matrix = glm::translate(model_matrix, position);
+    // Reset movement vector
+    movement = glm::vec3(0.0f, 0.0f, 0.0f);
+    
+}
+
+// Detects collision
+bool collided(glm::vec3 &position_a, glm::vec3 &position_b,
+              const glm::vec3 &init_position_a, const glm::vec3 &init_position_b,
+              const glm::vec3 &size_vec_a, const glm::vec3 &size_vec_b)
+{
+    // Collision factor
+    float collision_factor = 0.09f;
+    // Get current position
+    glm::vec3 curr_position_a = init_position_a + position_a;
+    glm::vec3 curr_position_b = init_position_b + position_b;
+    // Get x_ and y_distances
+    float x_distance = fabs(curr_position_a.x - curr_position_b.x) - (collision_factor * (size_vec_a.x + size_vec_b.x) / 2.0f);
+    float y_distance = fabs(curr_position_a.y - curr_position_b.y) - (collision_factor * (size_vec_a.y + size_vec_b.y) / 2.0f);
+
+    if (x_distance < 0 && y_distance < 0)
+    { return true; }
+    else { return false; }
 }
 
 
@@ -281,38 +330,31 @@ void process_input()
     const Uint8 *key_state = SDL_GetKeyboardState(NULL);
     
     // Right paddle movement
-    LOG(position_left_pad.y);
-    if (is_out_of_bound(position_right_pad, SIZE_PADDLE.y) == false)
+    if (key_state[SDL_SCANCODE_UP])
     {
-        if (key_state[SDL_SCANCODE_UP])
-        {
-            movement_right_pad.y = 1.0f;
-        }
-        else if (key_state[SDL_SCANCODE_DOWN])
-        {
-            movement_right_pad.y = -1.0f;
-        }
-        if (glm::length(movement_right_pad) > 1.0f)
-        {
-            movement_right_pad = glm::normalize(movement_right_pad);
-        }
+        movement_right_pad.y = 1.0f;
+    }
+    else if (key_state[SDL_SCANCODE_DOWN])
+    {
+        movement_right_pad.y = -1.0f;
+    }
+    if (glm::length(movement_right_pad) > 1.0f)
+    {
+        movement_right_pad = glm::normalize(movement_right_pad);
     }
     
     // Left paddle movement
-    if (is_out_of_bound(position_left_pad, SIZE_PADDLE.y) == false)
+    if (key_state[SDL_SCANCODE_W])
     {
-        if (key_state[SDL_SCANCODE_W])
-        {
-            movement_left_pad.y = 1.0f;
-        }
-        else if (key_state[SDL_SCANCODE_S])
-        {
-            movement_left_pad.y = -1.0f;
-        }
-        if (glm::length(movement_left_pad) > 1.0f)
-        {
-            movement_left_pad = glm::normalize(movement_left_pad);
-        }
+        movement_left_pad.y = 1.0f;
+    }
+    else if (key_state[SDL_SCANCODE_S])
+    {
+        movement_left_pad.y = -1.0f;
+    }
+    if (glm::length(movement_left_pad) > 1.0f)
+    {
+        movement_left_pad = glm::normalize(movement_left_pad);
     }
     
 
@@ -331,18 +373,29 @@ void update()
     reset(model_matrix_right_pad, INIT_POSITION_RIGHT_PAD, SIZE_PADDLE);
     reset(model_matrix_ball, INIT_POSITION_BALL, SIZE_BALL);
     
+    // Paddles movement
+    user_move_object(INIT_POSITION_LEFT_PAD, position_left_pad, SIZE_PADDLE, movement_left_pad,
+                SPEED_PAD, model_matrix_left_pad, delta_time);
+    user_move_object(INIT_POSITION_RIGHT_PAD, position_right_pad, SIZE_PADDLE, movement_right_pad,
+                SPEED_PAD, model_matrix_right_pad, delta_time);
+    
+    // Ball movement
     // Set new position
-    position_left_pad += movement_left_pad * SPEED_PAD * delta_time;
-    model_matrix_left_pad = glm::translate(model_matrix_left_pad, position_left_pad);
-    movement_left_pad = glm::vec3(0.0f, 0.0f, 0.0f);
-
-    position_right_pad += movement_right_pad * SPEED_PAD * delta_time;
-    model_matrix_right_pad = glm::translate(model_matrix_right_pad, position_right_pad);
-    movement_right_pad = glm::vec3(0.0f, 0.0f, 0.0f);
+    position_ball += movement_ball * SPEED_BALL * delta_time;
+    if (ball_hits_vertical_wall(INIT_POSITION_BALL, position_ball))
+    {
+        position_ball = glm::vec3(0.0f, 0.0f, 0.0f);
+    } else {
+        // Translate to new position
+        model_matrix_ball = glm::translate(model_matrix_ball, position_ball);
+    }
     
     // Rotate ball
     rot_angle += ROT_SPEED_BALL * delta_time;
     model_matrix_ball = glm::rotate(model_matrix_ball, glm::radians(rot_angle), glm::vec3(0.0f, 0.0f, 1.0f));
+    
+    LOG(collided(position_ball, position_left_pad, INIT_POSITION_BALL, INIT_POSITION_LEFT_PAD,
+                 SIZE_BALL, SIZE_PADDLE));
 }
 
 
