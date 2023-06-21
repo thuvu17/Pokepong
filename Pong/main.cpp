@@ -56,41 +56,51 @@ const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl",
 const char  SPRITE_LEFT_PADDLE[] = "sprites/left_paddle.png",
             SPRITE_RIGHT_PADDLE[] = "sprites/right_paddle.png",
             SPRITE_BALL[] = "sprites/ball.png",
-            SPRITE_LINE[] = "sprites/dotted_line.png";
+            SPRITE_LINE[] = "sprites/dotted_line.png",
+            SPRITE_P1[] = "sprites/player_1.png",
+            SPRITE_P2[] = "sprites/player_2.png",
+            SPRITE_P1_WIN[] = "sprites/p1_win.png",
+            SPRITE_P2_WIN[] = "sprites/p2_win.png";
 
 
 // Define objects
-ShaderProgram   program_left_pad,
-                program_right_pad,
-                program_ball,
-                program_line;
+ShaderProgram   program_left_pad, program_right_pad,
+                program_ball, program_line,
+                program_p1, program_p2,
+                program_p1_win, program_p2_win;
 
 // Texture IDs
-GLuint  texture_id_left_pad,
-        texture_id_right_pad,
-        texture_id_ball,
-        texture_id_line;
+GLuint  texture_id_left_pad, texture_id_right_pad,
+        texture_id_ball, texture_id_line,
+        texture_id_p1, texture_id_p2,
+        texture_id_p1_win, texture_id_p2_win;
 
 // Matrices
 glm::mat4 g_view_matrix,            // Camera position
           g_projection_matrix;      // Camera characteristics
 
 // Model matrices
-glm::mat4   model_matrix_left_pad,
-            model_matrix_right_pad,
-            model_matrix_ball,
-            model_matrix_line;
+glm::mat4   model_matrix_left_pad, model_matrix_right_pad,
+            model_matrix_ball, model_matrix_line,
+            model_matrix_p1, model_matrix_p2,
+            model_matrix_p1_win, model_matrix_p2_win;
 
 // Initial positions
 const glm::vec3 INIT_POSITION_LEFT_PAD (-3.5f, 0.0f, 0.0f),
                 INIT_POSITION_RIGHT_PAD (3.5f, 0.0f, 0.0f),
                 INIT_POSITION_BALL (0.0f, 0.0f, 0.0f),
-                INIT_POSITION_LINE (0.0f, 0.0f, 0.0f);
+                INIT_POSITION_LINE (0.0f, 0.0f, 0.0f),
+                INIT_POSITION_P1 (-2.5f, 3.0f, 0.0f),
+                INIT_POSITION_P2 (2.5f, 3.0f, 0.0f),
+                INIT_POSITION_P1_WIN (0.0f, 0.0f, 0.0f),
+                INIT_POSITION_P2_WIN (0.0f, 0.0f, 0.0f);
 
 // Sizes
 const glm::vec3 SIZE_PADDLE = glm::vec3(1.75f, 3.5f, 1.0f),
                 SIZE_BALL = glm::vec3(0.5f, 0.5f, 0.5f),
-                SIZE_LINE = glm::vec3(1.0f, 1.0f, 1.0f);
+                SIZE_LINE = glm::vec3(1.0f, 1.0f, 1.0f),
+                SIZE_PLAYER = glm::vec3(2.0f, 1.0f, 1.0f),
+                SIZE_WIN = glm::vec3(3.0f, 3.0f, 1.0f);
 
 // Whether object is moving
 glm::vec3   movement_left_pad,
@@ -174,13 +184,18 @@ void draw_object(ShaderProgram &program, glm::mat4 &model_matrix,
 // INITIALISE OBJECTS
 void init_objects(ShaderProgram &program, GLuint &texture_id,
                   const char* sprite, glm::mat4 &model_matrix,
-                  glm::mat4 &view_matrix, glm::mat4 &projection_matrix)
+                  glm::mat4 &view_matrix, glm::mat4 &projection_matrix,
+                  const glm::vec3 init_position, glm::vec3 size_vector)
 {
     // Load up shaders
     program.Load(V_SHADER_PATH, F_SHADER_PATH);
     
     // Initialize model matrix
     model_matrix = glm::mat4(1.0f);
+    // Translate to initial position
+    model_matrix  = glm::translate(model_matrix, init_position);
+    // Scale to initial size
+    model_matrix  = glm::scale(model_matrix, size_vector);
     
     // Load texture
     texture_id = load_texture(sprite);
@@ -291,16 +306,36 @@ void initialise()
     
     // Initialise objects
     init_objects(program_left_pad, texture_id_left_pad, SPRITE_LEFT_PADDLE,
-                 model_matrix_left_pad, g_view_matrix, g_projection_matrix);
+                 model_matrix_left_pad, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_LEFT_PAD, SIZE_PADDLE);
 
     init_objects(program_right_pad, texture_id_right_pad, SPRITE_RIGHT_PADDLE,
-                  model_matrix_right_pad, g_view_matrix, g_projection_matrix);
+                 model_matrix_right_pad, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_RIGHT_PAD, SIZE_PADDLE);
 
     init_objects(program_ball, texture_id_ball, SPRITE_BALL,
-                 model_matrix_ball, g_view_matrix, g_projection_matrix);
+                 model_matrix_ball, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_BALL, SIZE_BALL);
     
     init_objects(program_line, texture_id_line, SPRITE_LINE,
-                 model_matrix_line, g_view_matrix, g_projection_matrix);
+                 model_matrix_line, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_LINE, SIZE_LINE);
+    
+    init_objects(program_p1, texture_id_p1, SPRITE_P1,
+                 model_matrix_p1, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_P1, SIZE_PLAYER);
+    
+    init_objects(program_p2, texture_id_p2, SPRITE_P2,
+                 model_matrix_p2, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_P2, SIZE_PLAYER);
+    
+    init_objects(program_p1_win, texture_id_p1_win, SPRITE_P1_WIN,
+                 model_matrix_p1_win, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_P1_WIN, SIZE_WIN);
+    
+    init_objects(program_p2_win, texture_id_p2_win, SPRITE_P2_WIN,
+                 model_matrix_p2_win, g_view_matrix, g_projection_matrix,
+                 INIT_POSITION_P2_WIN, SIZE_WIN);
     // Enable blending
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -391,6 +426,7 @@ void update()
     // If ball hits vertical wall, end game
     if (ball_hits_vertical_wall(INIT_POSITION_BALL, position_ball))
     {
+        LOG("SCORE!");
         end_game = true;
         winner = (INIT_POSITION_BALL + position_ball).x < 0 ? 2 : 1;
     }
@@ -420,10 +456,10 @@ void update()
     rot_angle += ROT_SPEED_BALL * delta_time;
     model_matrix_ball = glm::rotate(model_matrix_ball, glm::radians(rot_angle), glm::vec3(0.0f, 0.0f, 1.0f));
     
-    // Scale all objects to their size
-    model_matrix_ball = glm::scale(model_matrix_ball, SIZE_BALL);
+    // Scale objects back
     model_matrix_left_pad = glm::scale(model_matrix_left_pad, SIZE_PADDLE);
     model_matrix_right_pad = glm::scale(model_matrix_right_pad, SIZE_PADDLE);
+    model_matrix_ball = glm::scale(model_matrix_ball, SIZE_BALL);
 }
 
 
@@ -431,38 +467,111 @@ void update()
 void render()
     {
     glClear(GL_COLOR_BUFFER_BIT);
-    
-    float vertices[] = {
-        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
-        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
-    };
+    // Show the winner
+    if (end_game)
+    {
+        if (winner == 1)
+        {
+            // Player 1 wins
+            float vertices_p1_win[] = {
+                -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+            };
+            float texture_coordinates_p1_win[] = {
+                0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+                0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+            };
+            draw_object(program_p1_win, model_matrix_p1_win, texture_id_p1_win,
+                        vertices_p1_win, texture_coordinates_p1_win);
+        }
+        else
+        {
+            // Player 2 wins
+            float vertices_p2_win[] = {
+                -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+            };
+            float texture_coordinates_p2_win[] = {
+                0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+                0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+            };
+            draw_object(program_p2_win, model_matrix_p2_win, texture_id_p2_win,
+                        vertices_p2_win, texture_coordinates_p2_win);
+        }
+    }
+    // Line
     float vertices_line[] = {
         -0.05f, -3.75f, 0.05f, -3.75f, 0.05f, 3.75f,
         -0.05f, -3.75f, 0.05f, 3.75f, -0.05f, 3.75f
     };
-    float texture_coordinates[] = {
+    float texture_coordinates_line[] = {
         0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
         0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
     };
-    
-
-    // Draw objects
     draw_object(program_line, model_matrix_line, texture_id_line,
-                vertices_line, texture_coordinates);
+                vertices_line, texture_coordinates_line);
+    
+    // Player 1
+    float vertices_p1[] = {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+    float texture_coordinates_p1[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+    };
+    draw_object(program_p1, model_matrix_p1, texture_id_p1,
+                vertices_p1, texture_coordinates_p1);
+    
+    // Player 2
+    float vertices_p2[] = {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+    float texture_coordinates_p2[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+    };
+    draw_object(program_p2, model_matrix_p2, texture_id_p2,
+                vertices_p2, texture_coordinates_p2);
+    
+    // Left paddle
+    float vertices_left_pad[] = {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+    float texture_coordinates_left_pad[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+    };
     draw_object(program_left_pad, model_matrix_left_pad, texture_id_left_pad,
-                vertices, texture_coordinates);
+                vertices_left_pad, texture_coordinates_left_pad);
+    
+    // Right paddle
+    float vertices_right_pad[] = {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+    float texture_coordinates_right_pad[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+    };
     draw_object(program_right_pad, model_matrix_right_pad, texture_id_right_pad,
-                vertices, texture_coordinates);
+                vertices_right_pad, texture_coordinates_right_pad);
+    
+    // Ball
+    float vertices_right_ball[] = {
+        -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
+    };
+    float texture_coordinates_ball[] = {
+        0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+    };
     draw_object(program_ball, model_matrix_ball, texture_id_ball,
-                vertices, texture_coordinates);
+                vertices_right_ball, texture_coordinates_ball);
     
     SDL_GL_SwapWindow(display_window);
-}
-
-// GAMEOVER
-void game_over()
-{
-    
 }
 
 
@@ -476,9 +585,9 @@ int main(int argc, char* argv[])
     
     while (game_is_running)
     {
+        LOG(end_game);
         process_input();
-        if (end_game) { game_over(); }
-        else { update(); }
+        if (end_game == false) { update(); }
         render();
     }
     
