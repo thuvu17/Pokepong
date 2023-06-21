@@ -55,18 +55,21 @@ const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl",
 // Sprites
 const char  SPRITE_LEFT_PADDLE[] = "sprites/left_paddle.png",
             SPRITE_RIGHT_PADDLE[] = "sprites/right_paddle.png",
-            SPRITE_BALL[] = "sprites/ball.png";
+            SPRITE_BALL[] = "sprites/ball.png",
+            SPRITE_LINE[] = "sprites/dotted_line.png";
 
 
 // Define objects
 ShaderProgram   program_left_pad,
                 program_right_pad,
-                program_ball;
+                program_ball,
+                program_line;
 
 // Texture IDs
 GLuint  texture_id_left_pad,
         texture_id_right_pad,
-        texture_id_ball;
+        texture_id_ball,
+        texture_id_line;
 
 // Matrices
 glm::mat4 g_view_matrix,            // Camera position
@@ -75,16 +78,19 @@ glm::mat4 g_view_matrix,            // Camera position
 // Model matrices
 glm::mat4   model_matrix_left_pad,
             model_matrix_right_pad,
-            model_matrix_ball;
+            model_matrix_ball,
+            model_matrix_line;
 
 // Initial positions
 const glm::vec3 INIT_POSITION_LEFT_PAD (-3.5f, 0.0f, 0.0f),
                 INIT_POSITION_RIGHT_PAD (3.5f, 0.0f, 0.0f),
-                INIT_POSITION_BALL (0.0f, 0.0f, 0.0f);
+                INIT_POSITION_BALL (0.0f, 0.0f, 0.0f),
+                INIT_POSITION_LINE (0.0f, 0.0f, 0.0f);
 
 // Sizes
 const glm::vec3 SIZE_PADDLE = glm::vec3(1.75f, 3.5f, 1.0f),
-                SIZE_BALL = glm::vec3(0.5f, 0.5f, 0.5f);
+                SIZE_BALL = glm::vec3(0.5f, 0.5f, 0.5f),
+                SIZE_LINE = glm::vec3(1.0f, 1.0f, 1.0f);
 
 // Whether object is moving
 glm::vec3   movement_left_pad,
@@ -293,6 +299,8 @@ void initialise()
     init_objects(program_ball, texture_id_ball, SPRITE_BALL,
                  model_matrix_ball, g_view_matrix, g_projection_matrix);
     
+    init_objects(program_line, texture_id_line, SPRITE_LINE,
+                 model_matrix_line, g_view_matrix, g_projection_matrix);
     // Enable blending
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -428,6 +436,10 @@ void render()
         -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
         -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f
     };
+    float vertices_line[] = {
+        -0.05f, -3.75f, 0.05f, -3.75f, 0.05f, 3.75f,
+        -0.05f, -3.75f, 0.05f, 3.75f, -0.05f, 3.75f
+    };
     float texture_coordinates[] = {
         0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
         0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f,
@@ -435,6 +447,8 @@ void render()
     
 
     // Draw objects
+    draw_object(program_line, model_matrix_line, texture_id_line,
+                vertices_line, texture_coordinates);
     draw_object(program_left_pad, model_matrix_left_pad, texture_id_left_pad,
                 vertices, texture_coordinates);
     draw_object(program_right_pad, model_matrix_right_pad, texture_id_right_pad,
