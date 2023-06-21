@@ -98,8 +98,8 @@ glm::vec3   position_left_pad,
             position_ball = glm::vec3(0.0f, 0.0f, 0.0f);
 
 // Speed
-const float SPEED_PAD = 1.0f,
-            SPEED_BALL = 2.0f,
+const float SPEED_PAD = 3.0f,
+            SPEED_BALL = 2.5f,
             ROT_SPEED_BALL = 45.f;
 
 float rot_angle = 0.0f;
@@ -110,7 +110,8 @@ float previous_ticks = 0.0f;
 // Game const
 SDL_Window* display_window;
 bool game_is_running = true;
-
+bool end_game = false;
+int winner;
 
 // LOAD TEXTURE
 GLuint load_texture(const char* filepath)
@@ -187,15 +188,12 @@ void init_objects(ShaderProgram &program, GLuint &texture_id,
 }
 
 // RESET
-void reset(glm::mat4 &model_matrix, const glm::vec3 init_position,
-           const glm::vec3 size_vector)
+void reset(glm::mat4 &model_matrix, const glm::vec3 init_position)
 {
     // Reset model matrix
     model_matrix  = glm::mat4(1.0f);
     // Translate to initial position
     model_matrix  = glm::translate(model_matrix, init_position);
-    // Set initial size
-    model_matrix  = glm::scale(model_matrix, size_vector);
 }
 
 // Checks whether objects hit the upper and lower walls
@@ -204,7 +202,7 @@ bool is_out_of_bound(const glm::vec3 &init_position, glm::vec3 &position,
 {
     float window_height = 3.75f;
     float boundary_limit = window_height - 0.5f * scale_vector.y;
-    glm::vec3 curr_position = (init_position + position) * scale_vector.y;
+    glm::vec3 curr_position = init_position + position;
     if (curr_position.y <= -boundary_limit or curr_position.y >= boundary_limit)
     { return true; }
     else { return false; }
@@ -215,7 +213,7 @@ bool ball_hits_vertical_wall(const glm::vec3 &init_position, glm::vec3 &position
 {
     float window_width = 5.0f;
     float boundary_limit = window_width - 0.5f * SIZE_BALL.x;
-    glm::vec3 curr_position = (init_position + position) * SIZE_BALL.x;
+    glm::vec3 curr_position = init_position + position;
     if (curr_position.x <= -boundary_limit or curr_position.x >= boundary_limit)
     { return true; }
     else { return false; }
@@ -246,7 +244,7 @@ bool collided(glm::vec3 &position_a, glm::vec3 &position_b,
               const glm::vec3 &size_vec_a, const glm::vec3 &size_vec_b)
 {
     // Collision factor
-    float collision_factor = 0.09f;
+    float collision_factor = 1.0f;
     // Get current position
     glm::vec3 curr_position_a = init_position_a + position_a;
     glm::vec3 curr_position_b = init_position_b + position_b;
@@ -265,7 +263,7 @@ void initialise()
 {
 
     SDL_Init(SDL_INIT_VIDEO);
-    display_window = SDL_CreateWindow("Squirtle Headbutt Game",
+    display_window = SDL_CreateWindow("Pokepong",
                                       SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                       WINDOW_WIDTH, WINDOW_HEIGHT,
                                       SDL_WINDOW_OPENGL);
@@ -369,11 +367,11 @@ void update()
     previous_ticks = ticks;
     
     // Reset model matrix
-    reset(model_matrix_left_pad, INIT_POSITION_LEFT_PAD, SIZE_PADDLE);
-    reset(model_matrix_right_pad, INIT_POSITION_RIGHT_PAD, SIZE_PADDLE);
-    reset(model_matrix_ball, INIT_POSITION_BALL, SIZE_BALL);
+    reset(model_matrix_left_pad, INIT_POSITION_LEFT_PAD);
+    reset(model_matrix_right_pad, INIT_POSITION_RIGHT_PAD);
+    reset(model_matrix_ball, INIT_POSITION_BALL);
     
-    // Paddles movement
+    // Paddles movement according to user input
     user_move_object(INIT_POSITION_LEFT_PAD, position_left_pad, SIZE_PADDLE, movement_left_pad,
                 SPEED_PAD, model_matrix_left_pad, delta_time);
     user_move_object(INIT_POSITION_RIGHT_PAD, position_right_pad, SIZE_PADDLE, movement_right_pad,
@@ -382,27 +380,48 @@ void update()
     // Ball movement
     // Set new position
     position_ball += movement_ball * SPEED_BALL * delta_time;
+    // If ball hits vertical wall, end game
     if (ball_hits_vertical_wall(INIT_POSITION_BALL, position_ball))
     {
-        position_ball = glm::vec3(0.0f, 0.0f, 0.0f);
-    } else {
-        // Translate to new position
+        end_game = true;
+        winner = (INIT_POSITION_BALL + position_ball).x < 0 ? 2 : 1;
+    }
+    // If ball collides with any paddle
+    else
+    {
+        if (collided(position_ball, position_left_pad, INIT_POSITION_BALL,
+                      INIT_POSITION_LEFT_PAD, SIZE_BALL, SIZE_PADDLE) or
+             collided(position_ball, position_right_pad, INIT_POSITION_BALL,
+                      INIT_POSITION_RIGHT_PAD, SIZE_BALL, SIZE_PADDLE))
+        {
+            position_ball -= movement_ball * SPEED_BALL * delta_time;
+            movement_ball = glm::vec3(-movement_ball.x, movement_ball.y, 0.0f);
+            position_ball += movement_ball * SPEED_BALL * delta_time;
+        }
+        else if (is_out_of_bound(INIT_POSITION_BALL, position_ball, SIZE_BALL))
+        {
+            position_ball -= movement_ball * SPEED_BALL * delta_time;
+            movement_ball = glm::vec3(movement_ball.x, -movement_ball.y, 0.0f);
+            position_ball += movement_ball * SPEED_BALL * delta_time;
+        }
+
         model_matrix_ball = glm::translate(model_matrix_ball, position_ball);
     }
-    
+
     // Rotate ball
     rot_angle += ROT_SPEED_BALL * delta_time;
     model_matrix_ball = glm::rotate(model_matrix_ball, glm::radians(rot_angle), glm::vec3(0.0f, 0.0f, 1.0f));
     
-    LOG(collided(position_ball, position_left_pad, INIT_POSITION_BALL, INIT_POSITION_LEFT_PAD,
-                 SIZE_BALL, SIZE_PADDLE));
+    // Scale all objects to their size
+    model_matrix_ball = glm::scale(model_matrix_ball, SIZE_BALL);
+    model_matrix_left_pad = glm::scale(model_matrix_left_pad, SIZE_PADDLE);
+    model_matrix_right_pad = glm::scale(model_matrix_right_pad, SIZE_PADDLE);
 }
 
 
 // RENDER
 void render()
     {
-    
     glClear(GL_COLOR_BUFFER_BIT);
     
     float vertices[] = {
@@ -426,6 +445,12 @@ void render()
     SDL_GL_SwapWindow(display_window);
 }
 
+// GAMEOVER
+void game_over()
+{
+    
+}
+
 
 // SHUTDOWN
 void shutdown() { SDL_Quit(); }
@@ -438,7 +463,8 @@ int main(int argc, char* argv[])
     while (game_is_running)
     {
         process_input();
-        update();
+        if (end_game) { game_over(); }
+        else { update(); }
         render();
     }
     
