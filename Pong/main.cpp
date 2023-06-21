@@ -111,7 +111,7 @@ float previous_ticks = 0.0f;
 SDL_Window* display_window;
 bool game_is_running = true;
 bool end_game = false;
-int winner;
+
 
 // LOAD TEXTURE
 GLuint load_texture(const char* filepath)
@@ -384,7 +384,6 @@ void update()
     if (ball_hits_vertical_wall(INIT_POSITION_BALL, position_ball))
     {
         end_game = true;
-        winner = (INIT_POSITION_BALL + position_ball).x < 0 ? 2 : 1;
     }
     // If ball collides with any paddle
     else
@@ -463,8 +462,7 @@ int main(int argc, char* argv[])
     while (game_is_running)
     {
         process_input();
-        if (end_game) { game_over(); }
-        else { update(); }
+        if (end_game == false) { update(); }
         render();
     }
     
