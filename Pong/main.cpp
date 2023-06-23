@@ -114,8 +114,8 @@ glm::vec3   position_left_pad,
             position_ball = glm::vec3(0.0f, 0.0f, 0.0f);
 
 // Speed
-const float SPEED_PAD = 3.0f,
-            SPEED_BALL = 2.5f,
+const float SPEED_PAD = 4.0f,
+            SPEED_BALL = 3.5f,
             ROT_SPEED_BALL = 45.f;
 
 float rot_angle = 0.0f;
